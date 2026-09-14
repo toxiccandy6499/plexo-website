@@ -1,0 +1,103 @@
+/* PLEXO Design System Theme Styles */
+
+@layer utilities {
+  /* Paper grain & texture */
+  .bg-plexo-paper {
+    background-color: #F5F2EB;
+    background-image: 
+      radial-gradient(#dcd5c5 0.75px, transparent 0.75px),
+      radial-gradient(#dcd5c5 0.75px, #F5F2EB 0.75px);
+    background-size: 30px 30px;
+    background-position: 0 0, 15px 15px;
+  }
+
+  /* Cabinet Grotesk brutalist heading */
+  .font-plexo-headline {
+    font-family: 'Cabinet Grotesk', 'Bebas Neue', sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    text-transform: uppercase;
+  }
+
+  .font-plexo-display {
+    font-family: 'Cabinet Grotesk', 'Bebas Neue', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 0.92;
+    text-transform: uppercase;
+  }
+
+  .font-plexo-script {
+    font-family: 'Caveat', cursive;
+    line-height: 1.1;
+  }
+
+  .font-plexo-mono {
+    font-family: 'Space Mono', monospace;
+    letter-spacing: -0.03em;
+  }
+
+  /* Yellow Scotch Tape Style */
+  .tape-yellow {
+    background: #FFE600;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+    position: relative;
+    display: inline-block;
+  }
+
+  .tape-red {
+    background: #E52320;
+    color: #FFFFFF;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+    position: relative;
+    display: inline-block;
+  }
+
+  /* Torn Edge Effects */
+  .torn-edge-left {
+    clip-path: polygon(
+      0% 0%, 100% 0%, 100% 100%, 0% 100%,
+      2% 95%, 0% 90%, 3% 85%, 1% 80%, 2% 75%, 0% 70%,
+      3% 65%, 1% 60%, 2% 55%, 0% 50%, 3% 45%, 1% 40%,
+      2% 35%, 0% 30%, 3% 25%, 1% 20%, 2% 15%, 0% 10%, 2% 5%
+    );
+  }
+
+  .torn-edge-right {
+    clip-path: polygon(
+      0% 0%, 98% 0%, 100% 5%, 97% 10%, 99% 15%, 96% 20%,
+      100% 25%, 97% 30%, 99% 35%, 96% 40%, 100% 45%, 97% 50%,
+      99% 55%, 96% 60%, 100% 65%, 97% 70%, 99% 75%, 96% 80%,
+      100% 85%, 97% 90%, 99% 95%, 96% 100%, 0% 100%
+    );
+  }
+
+  /* Ripped red paper banner effect */
+  .ripped-red-banner {
+    background: #E52320;
+    clip-path: polygon(
+      4% 0%, 100% 0%, 100% 100%, 2% 100%,
+      3% 92%, 0% 85%, 4% 78%, 1% 70%, 3% 62%, 0% 54%,
+      4% 46%, 1% 38%, 3% 30%, 0% 22%, 4% 14%, 1% 6%
+    );
+  }
+
+  /* Torn black box */
+  .torn-black-box {
+    background: #121214;
+    clip-path: polygon(
+      0% 3%, 3% 0%, 97% 0%, 100% 2%, 99% 97%, 97% 100%,
+      2% 100%, 0% 96%
+    );
+  }
+
+  /* Sticker pill shadow */
+  .sticker-shadow {
+    box-shadow: 2px 3px 0px #000000;
+  }
+
+  .sticker-shadow-lg {
+    box-shadow: 4px 6px 0px #000000;
+  }
+}
