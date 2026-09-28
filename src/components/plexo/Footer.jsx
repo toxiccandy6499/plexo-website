@@ -38,7 +38,7 @@ export function Footer({ onOpenWaitlist }) {
             <div className="flex items-center gap-3 text-black">
               {/* Instagram */}
               <a 
-                href="https://instagram.com" 
+                href="https://www.instagram.com/plexopay/" 
                 target="_blank" 
                 rel="noreferrer" 
                 className="p-1 hover:text-plexo-red transition-colors" 
@@ -49,7 +49,7 @@ export function Footer({ onOpenWaitlist }) {
 
               {/* X (Twitter) */}
               <a 
-                href="https://x.com" 
+                href="https://x.com/Plexo_Pay" 
                 target="_blank" 
                 rel="noreferrer" 
                 className="p-1 hover:text-plexo-red transition-colors" 
@@ -62,7 +62,7 @@ export function Footer({ onOpenWaitlist }) {
 
               {/* YouTube */}
               <a 
-                href="https://youtube.com" 
+                href="https://www.youtube.com/@PlexoPay" 
                 target="_blank" 
                 rel="noreferrer" 
                 className="p-1 hover:text-plexo-red transition-colors" 
