@@ -77,19 +77,12 @@ export function WaitlistModal({ isOpen, onClose }) {
         {!submitted ? (
           <div>
             {/* Modal Header */}
-            <div className="flex items-center gap-2 mb-2">
-              <DoodleCrown className="w-6 h-5 text-plexo-red" />
-              <span className="font-plexo-mono text-xs font-bold uppercase tracking-wider text-neutral-600">
-                VIP Early Access
-              </span>
-            </div>
-
             <h3 className="font-plexo-headline text-3xl text-black tracking-tight leading-tight uppercase mb-2">
-              CLAIM YOUR SPOT.
+              JOIN THE WAITLIST.
             </h3>
 
             <p className="text-xs text-neutral-600 font-medium mb-5 leading-relaxed">
-              Join 12,000+ members getting real cards, UPI roundups, and exclusive rewards before anyone else.
+              Be the first to get exclusive cards, zero hidden fees, and early rewards when we launch.
             </p>
 
             {/* Form */}
@@ -214,11 +207,11 @@ export function WaitlistModal({ isOpen, onClose }) {
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Securing Your Spot...</span>
+                      <span>Joining Waitlist...</span>
                     </>
                   ) : (
                     <>
-                      <span>Get Early Access</span>
+                      <span>Join the Waitlist</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

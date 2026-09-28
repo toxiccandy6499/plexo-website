@@ -76,7 +76,7 @@ export async function submitWaitlistEntry({ fullName, email, phone, age, occupat
 
     if (insertError) {
       if (insertError.code === '23505') {
-        return { success: false, error: 'This email is already registered on the VIP waitlist!' };
+        return { success: false, error: 'This email is already registered on the waitlist!' };
       }
       console.error('Supabase waitlist insert error:', insertError);
       return { success: false, error: insertError.message || 'Failed to submit. Please check your details.' };
