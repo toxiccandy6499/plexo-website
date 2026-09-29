@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, Download, Sparkles, Paintbrush, RotateCcw, RotateCw, Trash2, ArrowRight, Check, Palette, Plus, Minus, Move, Smartphone, CreditCard } from 'lucide-react';
 
 // Authentic Apple / iOS Emoji mappings for consistent high-res rendering across all platforms (iOS, Android, Desktop)
@@ -55,6 +55,23 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
   const [selectedStickerId, setSelectedStickerId] = useState(null);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [downloadPosterSuccess, setDownloadPosterSuccess] = useState(false);
+
+  // Live mutable refs to eliminate stale closure bugs during fast multi-touch gestures
+  const liveImagePosRef = useRef({ x: 0, y: 0 });
+  const liveImageScaleRef = useRef(1.0);
+  const liveStickersRef = useRef([]);
+
+  useEffect(() => {
+    liveImagePosRef.current = imagePos;
+  }, [imagePos]);
+
+  useEffect(() => {
+    liveImageScaleRef.current = imageScale;
+  }, [imageScale]);
+
+  useEffect(() => {
+    liveStickersRef.current = stickers;
+  }, [stickers]);
 
   // Drawing canvas refs & Card ref for drag calculations
   const cardRef = useRef(null);
@@ -128,9 +145,10 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
     reader.readAsDataURL(file);
   };
 
-  // Image Drag with Mouse / Pointer (framing photo freely on card)
+  // Image Drag with Mouse / Pointer (Desktop only - ignores touch to prevent conflict)
   const handleImagePointerDown = (e) => {
     if (activeTab !== 'upload' || !uploadedImage) return;
+    if (e.pointerType === 'touch') return; // Mobile touch handled exclusively by handleImageTouchStart
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     const cardEl = cardRef.current;
@@ -140,15 +158,18 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
     imageDragStartRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      origX: imagePos.x,
-      origY: imagePos.y,
+      origX: liveImagePosRef.current.x,
+      origY: liveImagePosRef.current.y,
       cardWidth: cardRect.width,
       cardHeight: cardRect.height,
       isPinching: false,
       startDist: 0,
-      origScale: imageScale,
+      origScale: liveImageScaleRef.current,
     };
     isDraggingImageRef.current = true;
+
+    let rAFId = null;
+    let pendingPos = null;
 
     const onPointerMove = (moveEvt) => {
       if (!isDraggingImageRef.current) return;
@@ -157,15 +178,25 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
       const dxPercent = (dx / imageDragStartRef.current.cardWidth) * 100;
       const dyPercent = (dy / imageDragStartRef.current.cardHeight) * 100;
 
-      // Allow dragging anywhere on the card surface
       const newX = Math.max(-100, Math.min(100, imageDragStartRef.current.origX + dxPercent));
       const newY = Math.max(-100, Math.min(100, imageDragStartRef.current.origY + dyPercent));
 
-      setImagePos({ x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) });
+      pendingPos = { x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) };
+      if (!rAFId) {
+        rAFId = requestAnimationFrame(() => {
+          if (pendingPos) {
+            liveImagePosRef.current = pendingPos;
+            setImagePos(pendingPos);
+            pendingPos = null;
+          }
+          rAFId = null;
+        });
+      }
     };
 
     const onPointerUp = () => {
       isDraggingImageRef.current = false;
+      if (rAFId) cancelAnimationFrame(rAFId);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
@@ -176,69 +207,112 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
     window.addEventListener('pointercancel', onPointerUp);
   };
 
-  // Image Drag & Pinch with Touch (supports zoom out to 0.2x)
+  // Image Drag & Pinch with Touch (Mobile 60/120fps fluid, zero glitch, seamless 1<->2 finger handoff)
   const handleImageTouchStart = (e) => {
     if (activeTab !== 'upload' || !uploadedImage) return;
     const cardEl = cardRef.current;
     if (!cardEl) return;
     const cardRect = cardEl.getBoundingClientRect();
 
+    if (e.cancelable) e.preventDefault();
+
     if (e.touches.length === 1) {
       const t = e.touches[0];
       imageDragStartRef.current = {
         startX: t.clientX,
         startY: t.clientY,
-        origX: imagePos.x,
-        origY: imagePos.y,
+        origX: liveImagePosRef.current.x,
+        origY: liveImagePosRef.current.y,
         cardWidth: cardRect.width,
         cardHeight: cardRect.height,
         isPinching: false,
         startDist: 0,
-        origScale: imageScale,
+        startMidX: t.clientX,
+        startMidY: t.clientY,
+        origScale: liveImageScaleRef.current,
       };
     } else if (e.touches.length >= 2) {
       const t0 = e.touches[0];
       const t1 = e.touches[1];
       const startDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      const startMidX = (t0.clientX + t1.clientX) / 2;
+      const startMidY = (t0.clientY + t1.clientY) / 2;
       imageDragStartRef.current = {
-        ...imageDragStartRef.current,
+        cardWidth: cardRect.width,
+        cardHeight: cardRect.height,
         isPinching: true,
-        startDist,
-        origScale: imageScale,
+        startDist: Math.max(10, startDist),
+        startMidX,
+        startMidY,
+        origScale: liveImageScaleRef.current,
+        origX: liveImagePosRef.current.x,
+        origY: liveImagePosRef.current.y,
+        startX: startMidX,
+        startY: startMidY,
       };
     }
     isDraggingImageRef.current = true;
+
+    let rAFId = null;
+    let pendingUpdate = null;
 
     const onTouchMove = (moveEvt) => {
       if (!isDraggingImageRef.current) return;
       if (moveEvt.cancelable) moveEvt.preventDefault();
 
       if (moveEvt.touches.length >= 2) {
-        // 2-Finger Pinch to Zoom (0.2x to 3.5x, requires intentional finger movement > 8px)
+        // 2-Finger Pinch to Zoom (0.2x to 3.5x) + 2-Finger Pan simultaneously
         const t0 = moveEvt.touches[0];
         const t1 = moveEvt.touches[1];
         const curDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-        if (imageDragStartRef.current.startDist > 0 && Math.abs(curDist - imageDragStartRef.current.startDist) > 8) {
-          const ratio = curDist / imageDragStartRef.current.startDist;
-          const newScale = Math.max(0.2, Math.min(3.5, parseFloat((imageDragStartRef.current.origScale * ratio).toFixed(2))));
-          setImageScale(newScale);
+        const curMidX = (t0.clientX + t1.clientX) / 2;
+        const curMidY = (t0.clientY + t1.clientY) / 2;
+
+        if (!imageDragStartRef.current.isPinching) {
+          imageDragStartRef.current = {
+            ...imageDragStartRef.current,
+            isPinching: true,
+            startDist: Math.max(10, curDist),
+            startMidX: curMidX,
+            startMidY: curMidY,
+            origScale: liveImageScaleRef.current,
+            origX: liveImagePosRef.current.x,
+            origY: liveImagePosRef.current.y,
+          };
+          return;
         }
+
+        const ratio = curDist / (imageDragStartRef.current.startDist || 1);
+        const newScale = Math.max(0.2, Math.min(3.5, parseFloat((imageDragStartRef.current.origScale * ratio).toFixed(3))));
+
+        const dx = curMidX - imageDragStartRef.current.startMidX;
+        const dy = curMidY - imageDragStartRef.current.startMidY;
+        const dxPercent = (dx / imageDragStartRef.current.cardWidth) * 100;
+        const dyPercent = (dy / imageDragStartRef.current.cardHeight) * 100;
+
+        const newX = Math.max(-100, Math.min(100, imageDragStartRef.current.origX + dxPercent));
+        const newY = Math.max(-100, Math.min(100, imageDragStartRef.current.origY + dyPercent));
+
+        pendingUpdate = {
+          pos: { x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) },
+          scale: newScale,
+        };
       } else if (moveEvt.touches.length === 1) {
+        const t = moveEvt.touches[0];
         if (imageDragStartRef.current.isPinching) {
-          const t = moveEvt.touches[0];
+          // Seamless handoff from 2 fingers to 1 finger: rebase to live coordinates
           imageDragStartRef.current = {
             ...imageDragStartRef.current,
             isPinching: false,
             startX: t.clientX,
             startY: t.clientY,
-            origX: imagePos.x,
-            origY: imagePos.y,
+            origX: liveImagePosRef.current.x,
+            origY: liveImagePosRef.current.y,
           };
           return;
         }
 
         // 1-Finger Drag to Reposition
-        const t = moveEvt.touches[0];
         const dx = t.clientX - imageDragStartRef.current.startX;
         const dy = t.clientY - imageDragStartRef.current.startY;
         const dxPercent = (dx / imageDragStartRef.current.cardWidth) * 100;
@@ -247,23 +321,44 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         const newX = Math.max(-100, Math.min(100, imageDragStartRef.current.origX + dxPercent));
         const newY = Math.max(-100, Math.min(100, imageDragStartRef.current.origY + dyPercent));
 
-        setImagePos({ x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) });
+        pendingUpdate = { pos: { x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) } };
+      }
+
+      if (pendingUpdate && !rAFId) {
+        rAFId = requestAnimationFrame(() => {
+          if (pendingUpdate) {
+            if (pendingUpdate.pos) {
+              liveImagePosRef.current = pendingUpdate.pos;
+              setImagePos(pendingUpdate.pos);
+            }
+            if (pendingUpdate.scale !== undefined) {
+              liveImageScaleRef.current = pendingUpdate.scale;
+              setImageScale(pendingUpdate.scale);
+            }
+            pendingUpdate = null;
+          }
+          rAFId = null;
+        });
       }
     };
 
     const onTouchEnd = (endEvt) => {
       if (endEvt.touches.length === 0) {
         isDraggingImageRef.current = false;
+        if (rAFId) cancelAnimationFrame(rAFId);
         window.removeEventListener('touchmove', onTouchMove);
         window.removeEventListener('touchend', onTouchEnd);
         window.removeEventListener('touchcancel', onTouchEnd);
       } else if (endEvt.touches.length === 1) {
-        imageDragStartRef.current.isPinching = false;
         const t = endEvt.touches[0];
-        imageDragStartRef.current.startX = t.clientX;
-        imageDragStartRef.current.startY = t.clientY;
-        imageDragStartRef.current.origX = imagePos.x;
-        imageDragStartRef.current.origY = imagePos.y;
+        imageDragStartRef.current = {
+          ...imageDragStartRef.current,
+          isPinching: false,
+          startX: t.clientX,
+          startY: t.clientY,
+          origX: liveImagePosRef.current.x,
+          origY: liveImagePosRef.current.y,
+        };
       }
     };
 
@@ -344,13 +439,14 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
 
   // Mouse / Pointer Drag Handler (for Desktop)
   const handleStickerPointerDown = (e, stickerId) => {
+    if (e.pointerType === 'touch') return;
     e.stopPropagation();
     setSelectedStickerId(stickerId);
 
     const card = cardRef.current;
     if (!card) return;
     const cardRect = card.getBoundingClientRect();
-    const targetSticker = stickers.find((s) => s.id === stickerId);
+    const targetSticker = liveStickersRef.current.find((s) => s.id === stickerId) || stickers.find((s) => s.id === stickerId);
     if (!targetSticker) return;
 
     dragStartRef.current = {
@@ -365,6 +461,9 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
     };
     isDraggingStickerRef.current = true;
 
+    let rAFId = null;
+    let pendingCoords = null;
+
     const onPointerMove = (moveEvent) => {
       if (!isDraggingStickerRef.current) return;
       if (moveEvent.cancelable) moveEvent.preventDefault();
@@ -377,13 +476,25 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
       const newX = Math.max(8, Math.min(92, dragStartRef.current.origX + dxPercent));
       const newY = Math.max(12, Math.min(88, dragStartRef.current.origY + dyPercent));
 
-      setStickers((prev) =>
-        prev.map((s) => (s.id === stickerId ? { ...s, x: newX, y: newY } : s))
-      );
+      pendingCoords = { x: newX, y: newY };
+      if (!rAFId) {
+        rAFId = requestAnimationFrame(() => {
+          if (pendingCoords) {
+            setStickers((prev) => {
+              const updated = prev.map((s) => (s.id === stickerId ? { ...s, ...pendingCoords } : s));
+              liveStickersRef.current = updated;
+              return updated;
+            });
+            pendingCoords = null;
+          }
+          rAFId = null;
+        });
+      }
     };
 
     const onPointerUp = () => {
       isDraggingStickerRef.current = false;
+      if (rAFId) cancelAnimationFrame(rAFId);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
     };
@@ -395,12 +506,13 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
   // Multi-Touch (2-Finger Rotate & Pinch-Scale, 1-Finger Drag) for Mobile
   const handleStickerTouchStart = (e, stickerId) => {
     e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
     setSelectedStickerId(stickerId);
 
     const card = cardRef.current;
     if (!card) return;
     const cardRect = card.getBoundingClientRect();
-    const targetSticker = stickers.find((s) => s.id === stickerId);
+    const targetSticker = liveStickersRef.current.find((s) => s.id === stickerId) || stickers.find((s) => s.id === stickerId);
     if (!targetSticker) return;
 
     if (e.touches.length === 1) {
@@ -422,34 +534,59 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
       const t1 = e.touches[1];
       const startAngle = Math.atan2(t1.clientY - t0.clientY, t1.clientX - t0.clientX) * (180 / Math.PI);
       const startDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      const startMidX = (t0.clientX + t1.clientX) / 2;
+      const startMidY = (t0.clientY + t1.clientY) / 2;
       dragStartRef.current = {
-        ...dragStartRef.current,
+        cardWidth: cardRect.width,
+        cardHeight: cardRect.height,
+        id: stickerId,
         isPinching: true,
         startAngle,
-        startDist,
+        startDist: Math.max(10, startDist),
+        startMidX,
+        startMidY,
         origRot: targetSticker.rotation || 0,
         origScale: targetSticker.scale || 1.0,
-        id: stickerId,
+        origX: targetSticker.x,
+        origY: targetSticker.y,
+        startX: startMidX,
+        startY: startMidY,
       };
     }
     isDraggingStickerRef.current = true;
 
+    let rAFId = null;
+    let pendingStickerUpdate = null;
+
     const onTouchMove = (moveEvt) => {
+      if (!isDraggingStickerRef.current) return;
       if (moveEvt.cancelable) moveEvt.preventDefault();
 
+      const curSticker = liveStickersRef.current.find((s) => s.id === stickerId);
+      if (!curSticker) return;
+
       if (moveEvt.touches.length >= 2) {
-        // 2-Finger Twist to Rotate & Pinch to Scale
+        // 2-Finger Twist to Rotate & Pinch to Scale + Pan simultaneously
         const t0 = moveEvt.touches[0];
         const t1 = moveEvt.touches[1];
         const curAngle = Math.atan2(t1.clientY - t0.clientY, t1.clientX - t0.clientX) * (180 / Math.PI);
         const curDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+        const curMidX = (t0.clientX + t1.clientX) / 2;
+        const curMidY = (t0.clientY + t1.clientY) / 2;
 
         if (!dragStartRef.current.isPinching) {
-          dragStartRef.current.isPinching = true;
-          dragStartRef.current.startAngle = curAngle;
-          dragStartRef.current.startDist = curDist;
-          dragStartRef.current.origRot = targetSticker.rotation || 0;
-          dragStartRef.current.origScale = targetSticker.scale || 1.0;
+          dragStartRef.current = {
+            ...dragStartRef.current,
+            isPinching: true,
+            startAngle: curAngle,
+            startDist: Math.max(10, curDist),
+            startMidX: curMidX,
+            startMidY: curMidY,
+            origRot: curSticker.rotation || 0,
+            origScale: curSticker.scale || 1.0,
+            origX: curSticker.x,
+            origY: curSticker.y,
+          };
           return;
         }
 
@@ -460,29 +597,34 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         let newScale = dragStartRef.current.origScale;
         if (dragStartRef.current.startDist > 0 && Math.abs(curDist - dragStartRef.current.startDist) > 8) {
           const ratio = curDist / dragStartRef.current.startDist;
-          newScale = Math.max(0.6, Math.min(2.8, parseFloat((dragStartRef.current.origScale * ratio).toFixed(2))));
+          newScale = Math.max(0.5, Math.min(2.8, parseFloat((dragStartRef.current.origScale * ratio).toFixed(2))));
         }
 
-        setStickers((prev) =>
-          prev.map((s) => (s.id === stickerId ? { ...s, rotation: newRot, scale: newScale } : s))
-        );
+        const dx = curMidX - dragStartRef.current.startMidX;
+        const dy = curMidY - dragStartRef.current.startMidY;
+        const dxPercent = (dx / dragStartRef.current.cardWidth) * 100;
+        const dyPercent = (dy / dragStartRef.current.cardHeight) * 100;
+
+        const newX = Math.max(8, Math.min(92, dragStartRef.current.origX + dxPercent));
+        const newY = Math.max(12, Math.min(88, dragStartRef.current.origY + dyPercent));
+
+        pendingStickerUpdate = { x: newX, y: newY, rotation: newRot, scale: newScale };
       } else if (moveEvt.touches.length === 1) {
+        const t = moveEvt.touches[0];
         if (dragStartRef.current.isPinching) {
-          const t = moveEvt.touches[0];
-          const cur = stickers.find((s) => s.id === stickerId) || targetSticker;
+          // Seamless handoff from 2 fingers to 1 finger without jump
           dragStartRef.current = {
             ...dragStartRef.current,
             isPinching: false,
             startX: t.clientX,
             startY: t.clientY,
-            origX: cur.x,
-            origY: cur.y,
+            origX: curSticker.x,
+            origY: curSticker.y,
           };
           return;
         }
 
         // 1-Finger Position Drag
-        const t = moveEvt.touches[0];
         const dx = t.clientX - dragStartRef.current.startX;
         const dy = t.clientY - dragStartRef.current.startY;
         const dxPercent = (dx / dragStartRef.current.cardWidth) * 100;
@@ -491,32 +633,41 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         const newX = Math.max(8, Math.min(92, dragStartRef.current.origX + dxPercent));
         const newY = Math.max(12, Math.min(88, dragStartRef.current.origY + dyPercent));
 
-        setStickers((prev) =>
-          prev.map((s) => (s.id === stickerId ? { ...s, x: newX, y: newY } : s))
-        );
+        pendingStickerUpdate = { x: newX, y: newY };
+      }
+
+      if (pendingStickerUpdate && !rAFId) {
+        rAFId = requestAnimationFrame(() => {
+          if (pendingStickerUpdate) {
+            setStickers((prev) => {
+              const updated = prev.map((s) => (s.id === stickerId ? { ...s, ...pendingStickerUpdate } : s));
+              liveStickersRef.current = updated;
+              return updated;
+            });
+            pendingStickerUpdate = null;
+          }
+          rAFId = null;
+        });
       }
     };
 
     const onTouchEnd = (endEvt) => {
       if (endEvt.touches.length === 0) {
         isDraggingStickerRef.current = false;
+        if (rAFId) cancelAnimationFrame(rAFId);
         window.removeEventListener('touchmove', onTouchMove);
         window.removeEventListener('touchend', onTouchEnd);
         window.removeEventListener('touchcancel', onTouchEnd);
       } else if (endEvt.touches.length === 1) {
         const t = endEvt.touches[0];
-        const cur = stickers.find((s) => s.id === stickerId) || targetSticker;
+        const cur = liveStickersRef.current.find((s) => s.id === stickerId) || targetSticker;
         dragStartRef.current = {
+          ...dragStartRef.current,
+          isPinching: false,
           startX: t.clientX,
           startY: t.clientY,
           origX: cur.x,
           origY: cur.y,
-          cardWidth: cardRect.width,
-          cardHeight: cardRect.height,
-          id: stickerId,
-          isPinching: false,
-          origRot: cur.rotation || 0,
-          origScale: cur.scale || 1.0,
         };
       }
     };
@@ -1102,10 +1253,10 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         </div>
 
         {/* Central Interactive Card Stage */}
-        <div className="py-2.5 flex flex-col items-center justify-center select-none w-full">
+        <div className="py-2.5 flex flex-col items-center justify-center select-none w-full touch-none">
             <div 
               ref={cardRef}
-              className={`relative w-full max-w-[320px] sm:max-w-[340px] aspect-[1.586/1] rounded-[18px] sm:rounded-[20px] ${selectedTheme.bg} border-2 ${selectedTheme.border} shadow-[0_16px_36px_rgba(0,0,0,0.35)] p-3.5 sm:p-4 flex flex-col justify-between overflow-hidden transition-all duration-200`}
+              className={`relative w-full max-w-[320px] sm:max-w-[340px] aspect-[1.586/1] rounded-[18px] sm:rounded-[20px] ${selectedTheme.bg} border-2 ${selectedTheme.border} shadow-[0_16px_36px_rgba(0,0,0,0.35)] p-3.5 sm:p-4 flex flex-col justify-between overflow-hidden touch-none transition-colors duration-200`}
             >
               {/* Uploaded Background Photo with Drag & Frame */}
               {uploadedImage && (
