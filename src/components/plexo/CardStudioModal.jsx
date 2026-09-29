@@ -34,7 +34,8 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
   const [customFontColor, setCustomFontColor] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imageScale, setImageScale] = useState(1.0);
-  const [imagePos, setImagePos] = useState({ x: 0, y: 0 }); // offset in percent of card (-60% to +60%)
+  const [imageAspect, setImageAspect] = useState(1.587);
+  const [imagePos, setImagePos] = useState({ x: 0, y: 0 }); // offset in percent of card (-100% to +100%)
   const isDraggingImageRef = useRef(false);
   const imageDragStartRef = useRef({
     startX: 0,
@@ -106,21 +107,28 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
   const activeFontColor = customFontColor || selectedTheme.textDefault;
   const selectedSticker = stickers.find((s) => s.id === selectedStickerId);
 
-  // Handle Photo Upload
+  // Handle Photo Upload (accommodating any format: portrait, square, landscape)
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      setUploadedImage(event.target.result);
-      setImagePos({ x: 0, y: 0 });
-      setImageScale(1.0);
-      setActiveTab('upload');
+      const dataUrl = event.target.result;
+      const img = new Image();
+      img.onload = () => {
+        const aspect = img.width / img.height;
+        setImageAspect(aspect);
+        setImageScale(1.0);
+        setImagePos({ x: 0, y: 0 });
+        setUploadedImage(dataUrl);
+        setActiveTab('upload');
+      };
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
   };
 
-  // Image Drag with Mouse / Pointer (framing photo on card)
+  // Image Drag with Mouse / Pointer (framing photo freely on card)
   const handleImagePointerDown = (e) => {
     if (activeTab !== 'upload' || !uploadedImage) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -149,8 +157,9 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
       const dxPercent = (dx / imageDragStartRef.current.cardWidth) * 100;
       const dyPercent = (dy / imageDragStartRef.current.cardHeight) * 100;
 
-      const newX = Math.max(-60, Math.min(60, imageDragStartRef.current.origX + dxPercent));
-      const newY = Math.max(-60, Math.min(60, imageDragStartRef.current.origY + dyPercent));
+      // Allow dragging anywhere on the card surface
+      const newX = Math.max(-100, Math.min(100, imageDragStartRef.current.origX + dxPercent));
+      const newY = Math.max(-100, Math.min(100, imageDragStartRef.current.origY + dyPercent));
 
       setImagePos({ x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) });
     };
@@ -167,7 +176,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
     window.addEventListener('pointercancel', onPointerUp);
   };
 
-  // Image Drag & Pinch with Touch
+  // Image Drag & Pinch with Touch (supports zoom out to 0.2x)
   const handleImageTouchStart = (e) => {
     if (activeTab !== 'upload' || !uploadedImage) return;
     const cardEl = cardRef.current;
@@ -205,13 +214,13 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
       if (moveEvt.cancelable) moveEvt.preventDefault();
 
       if (moveEvt.touches.length >= 2) {
-        // 2-Finger Pinch to Zoom
+        // 2-Finger Pinch to Zoom (0.2x to 3.5x)
         const t0 = moveEvt.touches[0];
         const t1 = moveEvt.touches[1];
         const curDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
         if (imageDragStartRef.current.startDist > 0) {
           const ratio = curDist / imageDragStartRef.current.startDist;
-          const newScale = Math.max(1.0, Math.min(3.0, parseFloat((imageDragStartRef.current.origScale * ratio).toFixed(2))));
+          const newScale = Math.max(0.2, Math.min(3.5, parseFloat((imageDragStartRef.current.origScale * ratio).toFixed(2))));
           setImageScale(newScale);
         }
       } else if (moveEvt.touches.length === 1 && !imageDragStartRef.current.isPinching) {
@@ -222,8 +231,8 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         const dxPercent = (dx / imageDragStartRef.current.cardWidth) * 100;
         const dyPercent = (dy / imageDragStartRef.current.cardHeight) * 100;
 
-        const newX = Math.max(-60, Math.min(60, imageDragStartRef.current.origX + dxPercent));
-        const newY = Math.max(-60, Math.min(60, imageDragStartRef.current.origY + dyPercent));
+        const newX = Math.max(-100, Math.min(100, imageDragStartRef.current.origX + dxPercent));
+        const newY = Math.max(-100, Math.min(100, imageDragStartRef.current.origY + dyPercent));
 
         setImagePos({ x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) });
       }
@@ -633,7 +642,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         img.onload = () => {
           const hRatio = 1200 / img.width;
           const vRatio = 756 / img.height;
-          const baseRatio = Math.max(hRatio, vRatio);
+          const baseRatio = Math.min(hRatio, vRatio);
           const totalScale = baseRatio * (imageScale || 1.0);
           const drawW = img.width * totalScale;
           const drawH = img.height * totalScale;
@@ -1088,7 +1097,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
                       transform: `translate(${imagePos.x}%, ${imagePos.y}%) scale(${imageScale})`,
                       transformOrigin: 'center center',
                     }}
-                    className="w-full h-full object-cover select-none pointer-events-none transition-none will-change-transform"
+                    className="w-full h-full object-contain select-none pointer-events-none transition-none will-change-transform"
                   />
                   {/* Visual Framing Hint when Upload tab is active */}
                   {activeTab === 'upload' && (
@@ -1386,6 +1395,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
                       setUploadedImage(null);
                       setImagePos({ x: 0, y: 0 });
                       setImageScale(1.0);
+                      setImageAspect(1.587);
                     }}
                     className="py-1.5 px-3 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-xl border border-red-300 flex items-center gap-1 cursor-pointer"
                   >
@@ -1395,57 +1405,87 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
                 )}
               </div>
 
-              {/* Photo Framing Adjustments Bar (Zoom & Center) */}
+              {/* Photo Framing Adjustments Bar (Zoom 0.2x-3.5x & Fit/Fill Presets) */}
               {uploadedImage && (
-                <div className="flex items-center justify-between gap-2 p-1.5 bg-neutral-100 rounded-xl border border-neutral-300 animate-fadeIn">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-neutral-100 rounded-xl border border-neutral-300 animate-fadeIn">
                   {/* Zoom Controls */}
                   <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-neutral-800">
-                    <span className="text-neutral-500 uppercase">Zoom:</span>
+                    <span className="text-neutral-500 uppercase">Scale:</span>
                     <button
                       type="button"
-                      onClick={() => setImageScale((s) => Math.max(1.0, parseFloat((s - 0.1).toFixed(2))))}
-                      disabled={imageScale <= 1.0}
-                      className="w-5 h-5 rounded bg-white border border-neutral-300 flex items-center justify-center hover:bg-neutral-200 disabled:opacity-40 cursor-pointer shadow-3xs"
-                      title="Zoom Out"
+                      onClick={() => setImageScale((s) => Math.max(0.2, parseFloat((s - 0.1).toFixed(2))))}
+                      disabled={imageScale <= 0.2}
+                      className="w-6 h-6 rounded-lg bg-white border border-neutral-300 flex items-center justify-center hover:bg-neutral-200 disabled:opacity-40 cursor-pointer shadow-3xs active:scale-95 transition-transform"
+                      title="Zoom Out (scale down to 0.2x)"
                     >
-                      <Minus className="w-3 h-3 text-black" />
+                      <Minus className="w-3.5 h-3.5 text-black" />
                     </button>
                     <input
                       type="range"
-                      min="1.0"
-                      max="3.0"
+                      min="0.2"
+                      max="3.5"
                       step="0.05"
                       value={imageScale}
                       onChange={(e) => setImageScale(parseFloat(e.target.value))}
-                      className="w-16 sm:w-24 h-1.5 accent-black cursor-pointer"
+                      className="w-20 sm:w-28 h-2 accent-black cursor-pointer"
                     />
                     <button
                       type="button"
-                      onClick={() => setImageScale((s) => Math.min(3.0, parseFloat((s + 0.1).toFixed(2))))}
-                      disabled={imageScale >= 3.0}
-                      className="w-5 h-5 rounded bg-white border border-neutral-300 flex items-center justify-center hover:bg-neutral-200 disabled:opacity-40 cursor-pointer shadow-3xs"
-                      title="Zoom In"
+                      onClick={() => setImageScale((s) => Math.min(3.5, parseFloat((s + 0.1).toFixed(2))))}
+                      disabled={imageScale >= 3.5}
+                      className="w-6 h-6 rounded-lg bg-white border border-neutral-300 flex items-center justify-center hover:bg-neutral-200 disabled:opacity-40 cursor-pointer shadow-3xs active:scale-95 transition-transform"
+                      title="Zoom In (scale up to 3.5x)"
                     >
-                      <Plus className="w-3 h-3 text-black" />
+                      <Plus className="w-3.5 h-3.5 text-black" />
                     </button>
-                    <span className="w-7 text-[10px] text-neutral-600 font-mono">
-                      {imageScale.toFixed(1)}x
+                    <span className="w-9 text-[11px] text-neutral-900 font-mono font-bold">
+                      {imageScale.toFixed(2)}x
                     </span>
                   </div>
 
-                  {/* Reset Framing Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImagePos({ x: 0, y: 0 });
-                      setImageScale(1.0);
-                    }}
-                    className="px-2 py-1 bg-white hover:bg-neutral-200 text-black border border-black rounded-lg text-[9px] font-mono font-bold flex items-center gap-1 cursor-pointer shrink-0"
-                    title="Center & reset photo"
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                    <span>Reset</span>
-                  </button>
+                  {/* Framing Presets: Fit Whole, Fill Card, Reset */}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageScale(1.0);
+                        setImagePos({ x: 0, y: 0 });
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
+                        Math.abs(imageScale - 1.0) < 0.05
+                          ? 'bg-black text-white border-black'
+                          : 'bg-white hover:bg-neutral-200 text-black border-neutral-300'
+                      }`}
+                      title="Fit entire photo without cropping"
+                    >
+                      Fit Whole
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cardAspect = 1200 / 756;
+                        const fillScale = imageAspect < cardAspect ? (cardAspect / imageAspect) : (imageAspect / cardAspect);
+                        setImageScale(parseFloat(Math.min(3.5, Math.max(1.0, fillScale)).toFixed(2)));
+                        setImagePos({ x: 0, y: 0 });
+                      }}
+                      className="px-2.5 py-1 bg-white hover:bg-neutral-200 text-black border border-neutral-300 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors"
+                      title="Fill card completely"
+                    >
+                      Fill Card
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImagePos({ x: 0, y: 0 });
+                        setImageScale(1.0);
+                      }}
+                      className="px-2 py-1 bg-white hover:bg-neutral-200 text-black border border-black rounded-lg text-[9px] font-mono font-bold flex items-center gap-1 cursor-pointer"
+                      title="Center & reset"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      <span>Reset</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
