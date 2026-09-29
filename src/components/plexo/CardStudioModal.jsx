@@ -33,6 +33,20 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
   const [cardTheme, setCardTheme] = useState('obsidian');
   const [customFontColor, setCustomFontColor] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
+  const [imageScale, setImageScale] = useState(1.0);
+  const [imagePos, setImagePos] = useState({ x: 0, y: 0 }); // offset in percent of card (-60% to +60%)
+  const isDraggingImageRef = useRef(false);
+  const imageDragStartRef = useRef({
+    startX: 0,
+    startY: 0,
+    origX: 0,
+    origY: 0,
+    cardWidth: 1,
+    cardHeight: 1,
+    isPinching: false,
+    startDist: 0,
+    origScale: 1.0,
+  });
   const [brushColor, setBrushColor] = useState('#FFE600');
   const [brushSize, setBrushSize] = useState(4);
   const [hasDrawn, setHasDrawn] = useState(false);
@@ -99,9 +113,141 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
     const reader = new FileReader();
     reader.onload = (event) => {
       setUploadedImage(event.target.result);
+      setImagePos({ x: 0, y: 0 });
+      setImageScale(1.0);
       setActiveTab('upload');
     };
     reader.readAsDataURL(file);
+  };
+
+  // Image Drag with Mouse / Pointer (framing photo on card)
+  const handleImagePointerDown = (e) => {
+    if (activeTab !== 'upload' || !uploadedImage) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    const cardEl = cardRef.current;
+    if (!cardEl) return;
+    const cardRect = cardEl.getBoundingClientRect();
+
+    imageDragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: imagePos.x,
+      origY: imagePos.y,
+      cardWidth: cardRect.width,
+      cardHeight: cardRect.height,
+      isPinching: false,
+      startDist: 0,
+      origScale: imageScale,
+    };
+    isDraggingImageRef.current = true;
+
+    const onPointerMove = (moveEvt) => {
+      if (!isDraggingImageRef.current) return;
+      const dx = moveEvt.clientX - imageDragStartRef.current.startX;
+      const dy = moveEvt.clientY - imageDragStartRef.current.startY;
+      const dxPercent = (dx / imageDragStartRef.current.cardWidth) * 100;
+      const dyPercent = (dy / imageDragStartRef.current.cardHeight) * 100;
+
+      const newX = Math.max(-60, Math.min(60, imageDragStartRef.current.origX + dxPercent));
+      const newY = Math.max(-60, Math.min(60, imageDragStartRef.current.origY + dyPercent));
+
+      setImagePos({ x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) });
+    };
+
+    const onPointerUp = () => {
+      isDraggingImageRef.current = false;
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  };
+
+  // Image Drag & Pinch with Touch
+  const handleImageTouchStart = (e) => {
+    if (activeTab !== 'upload' || !uploadedImage) return;
+    const cardEl = cardRef.current;
+    if (!cardEl) return;
+    const cardRect = cardEl.getBoundingClientRect();
+
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      imageDragStartRef.current = {
+        startX: t.clientX,
+        startY: t.clientY,
+        origX: imagePos.x,
+        origY: imagePos.y,
+        cardWidth: cardRect.width,
+        cardHeight: cardRect.height,
+        isPinching: false,
+        startDist: 0,
+        origScale: imageScale,
+      };
+    } else if (e.touches.length >= 2) {
+      const t0 = e.touches[0];
+      const t1 = e.touches[1];
+      const startDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      imageDragStartRef.current = {
+        ...imageDragStartRef.current,
+        isPinching: true,
+        startDist,
+        origScale: imageScale,
+      };
+    }
+    isDraggingImageRef.current = true;
+
+    const onTouchMove = (moveEvt) => {
+      if (!isDraggingImageRef.current) return;
+      if (moveEvt.cancelable) moveEvt.preventDefault();
+
+      if (moveEvt.touches.length >= 2) {
+        // 2-Finger Pinch to Zoom
+        const t0 = moveEvt.touches[0];
+        const t1 = moveEvt.touches[1];
+        const curDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+        if (imageDragStartRef.current.startDist > 0) {
+          const ratio = curDist / imageDragStartRef.current.startDist;
+          const newScale = Math.max(1.0, Math.min(3.0, parseFloat((imageDragStartRef.current.origScale * ratio).toFixed(2))));
+          setImageScale(newScale);
+        }
+      } else if (moveEvt.touches.length === 1 && !imageDragStartRef.current.isPinching) {
+        // 1-Finger Drag to Reposition
+        const t = moveEvt.touches[0];
+        const dx = t.clientX - imageDragStartRef.current.startX;
+        const dy = t.clientY - imageDragStartRef.current.startY;
+        const dxPercent = (dx / imageDragStartRef.current.cardWidth) * 100;
+        const dyPercent = (dy / imageDragStartRef.current.cardHeight) * 100;
+
+        const newX = Math.max(-60, Math.min(60, imageDragStartRef.current.origX + dxPercent));
+        const newY = Math.max(-60, Math.min(60, imageDragStartRef.current.origY + dyPercent));
+
+        setImagePos({ x: parseFloat(newX.toFixed(2)), y: parseFloat(newY.toFixed(2)) });
+      }
+    };
+
+    const onTouchEnd = (endEvt) => {
+      if (endEvt.touches.length === 0) {
+        isDraggingImageRef.current = false;
+        window.removeEventListener('touchmove', onTouchMove);
+        window.removeEventListener('touchend', onTouchEnd);
+        window.removeEventListener('touchcancel', onTouchEnd);
+      } else if (endEvt.touches.length === 1) {
+        imageDragStartRef.current.isPinching = false;
+        const t = endEvt.touches[0];
+        imageDragStartRef.current.startX = t.clientX;
+        imageDragStartRef.current.startY = t.clientY;
+        imageDragStartRef.current.origX = imagePos.x;
+        imageDragStartRef.current.origY = imagePos.y;
+      }
+    };
+
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchEnd);
   };
 
   // Canvas drawing handlers (Mouse & Touch)
@@ -477,7 +623,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
       ctx.fillRect(0, 0, 1200, 756);
     }
 
-    // 2. Draw Uploaded Photo
+    // 2. Draw Uploaded Photo (with pan & zoom framing)
     if (uploadedImage) {
       await new Promise((resolve) => {
         const img = new Image();
@@ -487,10 +633,13 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         img.onload = () => {
           const hRatio = 1200 / img.width;
           const vRatio = 756 / img.height;
-          const ratio = Math.max(hRatio, vRatio);
-          const centerShiftX = (1200 - img.width * ratio) / 2;
-          const centerShiftY = (756 - img.height * ratio) / 2;
-          ctx.drawImage(img, 0, 0, img.width, img.height, centerShiftX, centerShiftY, img.width * ratio, img.height * ratio);
+          const baseRatio = Math.max(hRatio, vRatio);
+          const totalScale = baseRatio * (imageScale || 1.0);
+          const drawW = img.width * totalScale;
+          const drawH = img.height * totalScale;
+          const centerX = (1200 - drawW) / 2 + ((imagePos?.x || 0) / 100) * 1200;
+          const centerY = (756 - drawH) / 2 + ((imagePos?.y || 0) / 100) * 756;
+          ctx.drawImage(img, 0, 0, img.width, img.height, centerX, centerY, drawW, drawH);
           resolve();
         };
         img.onerror = resolve;
@@ -922,13 +1071,35 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
               ref={cardRef}
               className={`relative w-full max-w-[320px] sm:max-w-[340px] aspect-[1.586/1] rounded-[18px] sm:rounded-[20px] ${selectedTheme.bg} border-2 ${selectedTheme.border} shadow-[0_16px_36px_rgba(0,0,0,0.35)] p-3.5 sm:p-4 flex flex-col justify-between overflow-hidden transition-all duration-200`}
             >
-              {/* Uploaded Background Photo */}
+              {/* Uploaded Background Photo with Drag & Frame */}
               {uploadedImage && (
-                <img 
-                  src={uploadedImage} 
-                  alt="Custom Card Art" 
-                  className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
-                />
+                <div 
+                  className={`absolute inset-0 w-full h-full overflow-hidden z-0 select-none ${
+                    activeTab === 'upload' ? 'cursor-grab active:cursor-grabbing touch-none' : 'pointer-events-none'
+                  }`}
+                  onPointerDown={activeTab === 'upload' ? handleImagePointerDown : undefined}
+                  onTouchStart={activeTab === 'upload' ? handleImageTouchStart : undefined}
+                >
+                  <img 
+                    src={uploadedImage} 
+                    alt="Custom Card Art" 
+                    draggable={false}
+                    style={{
+                      transform: `translate(${imagePos.x}%, ${imagePos.y}%) scale(${imageScale})`,
+                      transformOrigin: 'center center',
+                    }}
+                    className="w-full h-full object-cover select-none pointer-events-none transition-none will-change-transform"
+                  />
+                  {/* Visual Framing Hint when Upload tab is active */}
+                  {activeTab === 'upload' && (
+                    <div className="absolute inset-0 border-2 border-dashed border-[#FFE600]/80 rounded-[18px] sm:rounded-[20px] pointer-events-none z-10 flex items-center justify-center">
+                      <div className="bg-black/60 backdrop-blur-xs text-[#FFE600] font-mono text-[9px] font-bold px-2.5 py-1 rounded-full pointer-events-none shadow-sm flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
+                        <Move className="w-3 h-3" />
+                        <span>Drag photo to frame</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Specular Holographic Reflection Sheen */}
@@ -1123,9 +1294,11 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
             <span className="text-[10px] sm:text-[11px] font-bold text-neutral-500 mt-2 flex items-center gap-1 text-center px-2">
               {selectedSticker 
                 ? `🎯 Drag ${selectedSticker.emoji} anywhere! Twist 2 fingers or drag top handle to rotate.`
-                : activeTab === 'paint' 
-                  ? '🎨 Stamp emojis & rotate with fingers, or paint graffiti!' 
-                  : '✨ Preview updates live. Download poster or card below.'}
+                : activeTab === 'upload' && uploadedImage
+                  ? '🖐️ Drag photo on the card to frame it. Pinch or use slider below to zoom.'
+                  : activeTab === 'paint' 
+                    ? '🎨 Stamp emojis & rotate with fingers, or paint graffiti!' 
+                    : '✨ Preview updates live. Download poster or card below.'}
             </span>
           </div>
 
@@ -1189,7 +1362,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
 
           {/* 2. Photo Upload Tab */}
           {activeTab === 'upload' && (
-            <div className="flex items-center justify-between gap-2">
+            <div className="space-y-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1197,22 +1370,83 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
                 onChange={handleImageUpload}
                 className="hidden"
               />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 py-1.5 px-3 bg-[#FFE600] hover:bg-[#FFDF00] text-black font-black text-xs rounded-xl border-2 border-black flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Choose Photo</span>
-              </button>
 
-              {uploadedImage && (
+              <div className="flex items-center justify-between gap-2">
                 <button
-                  onClick={() => setUploadedImage(null)}
-                  className="py-1.5 px-3 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-xl border border-red-300 flex items-center gap-1 cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 py-1.5 px-3 bg-[#FFE600] hover:bg-[#FFDF00] text-black font-black text-xs rounded-xl border-2 border-black flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove</span>
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{uploadedImage ? 'Change Photo' : 'Choose Photo'}</span>
                 </button>
+
+                {uploadedImage && (
+                  <button
+                    onClick={() => {
+                      setUploadedImage(null);
+                      setImagePos({ x: 0, y: 0 });
+                      setImageScale(1.0);
+                    }}
+                    className="py-1.5 px-3 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-xl border border-red-300 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remove</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Photo Framing Adjustments Bar (Zoom & Center) */}
+              {uploadedImage && (
+                <div className="flex items-center justify-between gap-2 p-1.5 bg-neutral-100 rounded-xl border border-neutral-300 animate-fadeIn">
+                  {/* Zoom Controls */}
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-neutral-800">
+                    <span className="text-neutral-500 uppercase">Zoom:</span>
+                    <button
+                      type="button"
+                      onClick={() => setImageScale((s) => Math.max(1.0, parseFloat((s - 0.1).toFixed(2))))}
+                      disabled={imageScale <= 1.0}
+                      className="w-5 h-5 rounded bg-white border border-neutral-300 flex items-center justify-center hover:bg-neutral-200 disabled:opacity-40 cursor-pointer shadow-3xs"
+                      title="Zoom Out"
+                    >
+                      <Minus className="w-3 h-3 text-black" />
+                    </button>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="3.0"
+                      step="0.05"
+                      value={imageScale}
+                      onChange={(e) => setImageScale(parseFloat(e.target.value))}
+                      className="w-16 sm:w-24 h-1.5 accent-black cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setImageScale((s) => Math.min(3.0, parseFloat((s + 0.1).toFixed(2))))}
+                      disabled={imageScale >= 3.0}
+                      className="w-5 h-5 rounded bg-white border border-neutral-300 flex items-center justify-center hover:bg-neutral-200 disabled:opacity-40 cursor-pointer shadow-3xs"
+                      title="Zoom In"
+                    >
+                      <Plus className="w-3 h-3 text-black" />
+                    </button>
+                    <span className="w-7 text-[10px] text-neutral-600 font-mono">
+                      {imageScale.toFixed(1)}x
+                    </span>
+                  </div>
+
+                  {/* Reset Framing Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImagePos({ x: 0, y: 0 });
+                      setImageScale(1.0);
+                    }}
+                    className="px-2 py-1 bg-white hover:bg-neutral-200 text-black border border-black rounded-lg text-[9px] font-mono font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                    title="Center & reset photo"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    <span>Reset</span>
+                  </button>
+                </div>
               )}
             </div>
           )}
