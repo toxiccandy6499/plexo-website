@@ -3,7 +3,7 @@ import { PlexoLogo } from './PlexoLogo';
 import { ArrowRight, Instagram, Youtube } from 'lucide-react';
 
 export function Footer({ onOpenWaitlist }) {
-  const footerLinks = ['Spend', 'Save', 'Invest', 'Pay', 'Earn'];
+  const footerLinks = ['Spend', 'Save', 'Invest', 'Earn'];
 
   return (
     <footer className="border-t border-[#D8D3C5] bg-[#F6F4EE] py-10 mt-12 select-none">
