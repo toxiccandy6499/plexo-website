@@ -214,16 +214,29 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
       if (moveEvt.cancelable) moveEvt.preventDefault();
 
       if (moveEvt.touches.length >= 2) {
-        // 2-Finger Pinch to Zoom (0.2x to 3.5x)
+        // 2-Finger Pinch to Zoom (0.2x to 3.5x, requires intentional finger movement > 8px)
         const t0 = moveEvt.touches[0];
         const t1 = moveEvt.touches[1];
         const curDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-        if (imageDragStartRef.current.startDist > 0) {
+        if (imageDragStartRef.current.startDist > 0 && Math.abs(curDist - imageDragStartRef.current.startDist) > 8) {
           const ratio = curDist / imageDragStartRef.current.startDist;
           const newScale = Math.max(0.2, Math.min(3.5, parseFloat((imageDragStartRef.current.origScale * ratio).toFixed(2))));
           setImageScale(newScale);
         }
-      } else if (moveEvt.touches.length === 1 && !imageDragStartRef.current.isPinching) {
+      } else if (moveEvt.touches.length === 1) {
+        if (imageDragStartRef.current.isPinching) {
+          const t = moveEvt.touches[0];
+          imageDragStartRef.current = {
+            ...imageDragStartRef.current,
+            isPinching: false,
+            startX: t.clientX,
+            startY: t.clientY,
+            origX: imagePos.x,
+            origY: imagePos.y,
+          };
+          return;
+        }
+
         // 1-Finger Drag to Reposition
         const t = moveEvt.touches[0];
         const dx = t.clientX - imageDragStartRef.current.startX;
@@ -445,7 +458,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         newRot = ((newRot % 360) + 360) % 360;
 
         let newScale = dragStartRef.current.origScale;
-        if (dragStartRef.current.startDist > 0) {
+        if (dragStartRef.current.startDist > 0 && Math.abs(curDist - dragStartRef.current.startDist) > 8) {
           const ratio = curDist / dragStartRef.current.startDist;
           newScale = Math.max(0.6, Math.min(2.8, parseFloat((dragStartRef.current.origScale * ratio).toFixed(2))));
         }
@@ -453,7 +466,21 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
         setStickers((prev) =>
           prev.map((s) => (s.id === stickerId ? { ...s, rotation: newRot, scale: newScale } : s))
         );
-      } else if (moveEvt.touches.length === 1 && !dragStartRef.current.isPinching) {
+      } else if (moveEvt.touches.length === 1) {
+        if (dragStartRef.current.isPinching) {
+          const t = moveEvt.touches[0];
+          const cur = stickers.find((s) => s.id === stickerId) || targetSticker;
+          dragStartRef.current = {
+            ...dragStartRef.current,
+            isPinching: false,
+            startX: t.clientX,
+            startY: t.clientY,
+            origX: cur.x,
+            origY: cur.y,
+          };
+          return;
+        }
+
         // 1-Finger Position Drag
         const t = moveEvt.touches[0];
         const dx = t.clientX - dragStartRef.current.startX;
@@ -678,7 +705,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
       ctx.translate(x, y);
       ctx.rotate(((st.rotation || 0) * Math.PI) / 180);
       const stScale = st.scale || 1.0;
-      const size = Math.round(96 * stScale);
+      const size = Math.round(124 * stScale);
 
       const code = EMOJI_CODE_MAP[st.emoji];
       if (code) {
@@ -691,7 +718,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
           img.onerror = () => {
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
-            ctx.font = `${Math.round(76 * stScale)}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+            ctx.font = `${Math.round(98 * stScale)}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(st.emoji, 0, 0);
@@ -1135,7 +1162,7 @@ export function CardStudioModal({ isOpen, onClose, onOpenWaitlist }) {
               {stickers.map((st) => {
                 const isSelected = st.id === selectedStickerId;
                 const scale = st.scale || 1.0;
-                const basePx = 28; // base preview font size
+                const basePx = 36; // base preview font size
                 const currentPx = Math.round(basePx * scale);
 
                 return (
