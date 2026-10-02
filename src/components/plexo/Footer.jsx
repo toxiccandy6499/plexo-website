@@ -88,11 +88,6 @@ export function Footer({ onOpenWaitlist }) {
           </div>
 
         </div>
-
-        {/* Bottom Micro Copy */}
-        <div className="mt-8 pt-6 border-t border-[#E8E3D5] text-center text-xs text-neutral-500 font-medium">
-          &copy; {new Date().getFullYear()} PLEXO Financial Technologies Inc. Made for students, designed for freedom.
-        </div>
       </div>
     </footer>
   );
