@@ -13,7 +13,6 @@ export function WaitlistModal({ isOpen, onClose }) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [waitlistNumber, setWaitlistNumber] = useState(1482);
 
   if (!isOpen) return null;
 
@@ -34,7 +33,6 @@ export function WaitlistModal({ isOpen, onClose }) {
       });
 
       if (result.success) {
-        setWaitlistNumber(result.waitlistNumber);
         setSubmitted(true);
       } else {
         setErrorMessage(result.error || 'Failed to submit. Please try again.');
@@ -234,16 +232,11 @@ export function WaitlistModal({ isOpen, onClose }) {
               </p>
             </div>
 
-            <div className="bg-white border-2 border-black p-4 rounded-2xl shadow-xs inline-block">
-              <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">Your Queue Number</span>
-              <span className="font-plexo-mono text-3xl font-black text-plexo-red">
-                #{waitlistNumber}
-              </span>
+            <div className="bg-white border-2 border-black p-4 rounded-2xl shadow-xs max-w-xs mx-auto">
+              <p className="text-xs text-neutral-700 font-medium leading-relaxed">
+                We will notify you at <span className="font-bold text-black">{email}</span> and SMS to <span className="font-bold text-black">{phone}</span> as soon as access opens.
+              </p>
             </div>
-
-            <p className="text-xs text-neutral-500 font-medium">
-              We just sent a confirmation to <span className="font-bold text-black">{email}</span> and SMS to <span className="font-bold text-black">{phone}</span>.
-            </p>
 
             <div>
               <button
