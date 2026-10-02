@@ -32,7 +32,7 @@ export function HeroSection({ onOpenWaitlist }) {
 
             {/* Monospace Subtitle */}
             <div className="font-plexo-mono text-neutral-800 text-sm sm:text-base leading-relaxed max-w-md mb-8 space-y-1">
-              <p className="font-medium">Spend. Save. Invest. Get rewarded.</p>
+              <p className="font-medium">Spend. Save &amp; Invest. Custom Cards. Get rewarded.</p>
               <p className="font-medium">One place for everything you do with your money.</p>
             </div>
 

@@ -9,7 +9,8 @@ export function BentoGridRow2({ onOpenWaitlist }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* LEFT COLUMN: SAVE & INVEST (Span 7) */}
-        <div id="save" className="lg:col-span-7 relative bg-[#FAF8F5] border border-[#D8D3C5] rounded-3xl p-6 sm:p-8 overflow-hidden shadow-sm flex flex-col justify-between min-h-[500px]">
+        <div id="save-invest" className="lg:col-span-7 relative bg-[#FAF8F5] border border-[#D8D3C5] rounded-3xl p-6 sm:p-8 overflow-hidden shadow-sm flex flex-col justify-between min-h-[500px] scroll-mt-24">
+          <span id="save" className="absolute -top-24" />
           
           {/* Top Yellow Scotch Tape Badge */}
           <div className="absolute -top-1 left-8 z-20 transform -rotate-1">

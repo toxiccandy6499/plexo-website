@@ -205,7 +205,7 @@ export function BentoGridRow1({ onOpenWaitlist, onOpenCardStudio }) {
         </div>
 
         {/* CARD 3: CUSTOM CARDS (Tightly Overlapping Physical Cards) */}
-        <div className="relative bg-[#FAF8F5] border border-[#D8D3C5] rounded-3xl p-5 sm:p-6 overflow-hidden shadow-sm flex flex-col justify-between min-h-[430px] sm:min-h-[460px]">
+        <div id="custom-cards" className="relative bg-[#FAF8F5] border border-[#D8D3C5] rounded-3xl p-5 sm:p-6 overflow-hidden shadow-sm flex flex-col justify-between min-h-[430px] sm:min-h-[460px] scroll-mt-24">
           
           {/* Top Yellow Sticker Badge (Bigger & Bolder) */}
           <div className="absolute -top-1 left-6 z-20 transform -rotate-1">

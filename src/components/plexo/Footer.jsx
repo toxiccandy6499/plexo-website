@@ -3,7 +3,12 @@ import { PlexoLogo } from './PlexoLogo';
 import { ArrowRight, Instagram, Youtube } from 'lucide-react';
 
 export function Footer({ onOpenWaitlist }) {
-  const footerLinks = ['Spend', 'Save', 'Invest', 'Earn'];
+  const footerLinks = [
+    { label: 'Spend', href: '#spend' },
+    { label: 'Save & Invest', href: '#save-invest' },
+    { label: 'Custom Cards', href: '#custom-cards' },
+    { label: 'Earn', href: '#earn' },
+  ];
 
   return (
     <footer className="border-t border-[#D8D3C5] bg-[#F6F4EE] py-10 mt-12 select-none">
@@ -18,12 +23,12 @@ export function Footer({ onOpenWaitlist }) {
           {/* Center: Slash Separated Category Links */}
           <div className="flex items-center flex-wrap justify-center gap-3 text-xs sm:text-sm font-bold text-neutral-800 tracking-wide font-plexo-mono">
             {footerLinks.map((item, index) => (
-              <React.Fragment key={item}>
+              <React.Fragment key={item.label}>
                 <a 
-                  href={`#${item.toLowerCase()}`} 
+                  href={item.href} 
                   className="hover:text-plexo-red transition-colors"
                 >
-                  {item}
+                  {item.label}
                 </a>
                 {index < footerLinks.length - 1 && (
                   <span className="text-neutral-400 font-normal">/</span>
