@@ -5,12 +5,40 @@
     <link rel="icon" type="image/png" href="/plexo_coin_gold-p.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="description" content="The personal finance app built for 18+ college students and graduates. Pay with UPI, get your own student debit card, save, start investing from ₹100 a month and get rewarded." />
-    <title>PLEXO — Spend smarter, the PLEXO way</title>
+    <title>PlexoPay — Student Debit Card, UPI &amp; Savings App for College Students in India</title>
+    <link rel="canonical" href="https://plexopay.in/" />
+
+    <!-- Structured data: tells Google and AI answer engines who PlexoPay is -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://plexopay.in/#organization",
+          "name": "PlexoPay",
+          "alternateName": ["Plexo", "PLEXO"],
+          "url": "https://plexopay.in/",
+          "logo": "https://plexopay.in/logo.png",
+          "description": "PlexoPay is a Bengaluru-based student fintech startup building a student-verified card, UPI payments and savings for college students in India.",
+          "address": { "@type": "PostalAddress", "addressLocality": "Bengaluru", "addressCountry": "IN" },
+          "sameAs": ["https://www.instagram.com/plexopay/"]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://plexopay.in/#website",
+          "url": "https://plexopay.in/",
+          "name": "PlexoPay",
+          "publisher": { "@id": "https://plexopay.in/#organization" }
+        }
+      ]
+    }
+    </script>
 
     <!-- Link preview card (WhatsApp, Instagram, X, iMessage, LinkedIn). %SITE_URL% is filled in at build time (see vite.config.js). -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="PLEXO" />
-    <meta property="og:title" content="PLEXO — Spend smarter, the PLEXO way" />
+    <meta property="og:site_name" content="PlexoPay" />
+    <meta property="og:title" content="PlexoPay — Spend smarter, the PLEXO way" />
     <meta property="og:description" content="The personal finance app built for college students and grads. UPI, your own student debit card, saving and investing from ₹100. Join the waitlist." />
     <meta property="og:url" content="%SITE_URL%/" />
     <meta property="og:image" content="%SITE_URL%/og-image.jpg" />
@@ -28,6 +56,10 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <h1>PlexoPay — personal finance app for college students in India</h1>
+      <p>PlexoPay is a Bengaluru-based student fintech startup building a student-verified card, UPI payments and savings for college students in India. Pay with UPI, get your own student debit card, save, and start investing from ₹100 a month. Join the waitlist at plexopay.in.</p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
