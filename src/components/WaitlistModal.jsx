@@ -187,6 +187,10 @@ export function WaitlistModal({ isOpen, onClose, preview = null }) {
       const { submitWaitlistEntry } = api;
       const result = await submitWaitlistEntry({ fullName, email, phone, age, occupation, honeypot });
       if (result.success) {
+        // Analytics: count a real waitlist signup as a lead (no personal details are sent).
+        if (!result.isSpam && !result.isMock && typeof window.gtag === 'function') {
+          window.gtag('event', 'generate_lead', { method: 'waitlist' });
+        }
         setSubmitted(true);
         clearDraft();
       } else {
